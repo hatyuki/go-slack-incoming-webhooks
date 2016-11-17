@@ -1,0 +1,16 @@
+hash: 1e04baaea72a5aaf039a44c7d3bce45bb9762b097d4c0c209751f89ee33a1098
+updated: 2016-11-17T12:06:10.17601412+09:00
+imports:
+- name: github.com/burntsushi/xdg
+  version: e80d3446fea190e21fbd294569844f066e47ccfc
+- name: github.com/jessevdk/go-flags
+  version: 8bc97d602c3bfeb5fc6fc9b5a9c898f245495637
+- name: github.com/mattn/go-isatty
+  version: 3a115632dcd687f9c8cd01679c83a06a0e21c1f3
+- name: github.com/pkg/errors
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
+- name: golang.org/x/sys
+  version: b699b7032584f0953262cb2788a0ca19bb494703
+  subpackages:
+  - unix
+testImports: []
