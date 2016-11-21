@@ -23,7 +23,7 @@ or please run the command with `--webhook-url` option.
 
 ## Usage
 
-    slack-incoming-webhooks [--webhook-url=WEBHOOK_URL] [-c=CHANNEL] [-u=USERNAME] [-e=ICON_EMOJI|-i=ICON_URL] [MESSAGE ...]
+    slack-incoming-webhooks [-w=WEBHOOK_URL] [-c=CHANNEL] [-u=USERNAME] [-e=ICON_EMOJI|-i=ICON_URL] [MESSAGE ...]
                             [--configure=WEBHOOK_URL]
                             [--help]
 
@@ -41,11 +41,11 @@ or please run the command with `--webhook-url` option.
 ### Examples
 ```bash
 slack-incoming-webhooks --channel general "Hello, world!"
-slack-incoming-webhooks --webhook-url "<YOUR_WEBHOOK_URL>" --username "I am bot" "Hello, incoming webhooks"
+slack-incoming-webhooks --webhook-url "<YOUR_WEBHOOK_URL>" --username "I am bot" Hello
 ```
 
 You can also pass in the message through _stdin_ like this:
 
 ```bash
-echo -n "Hello, world!" | slack-incoming-webhooks --username bot --icon-emoji :ghost:
+echo -n "Hello, world!" | slack-incoming-webhooks --icon-emoji :ghost:
 ```
