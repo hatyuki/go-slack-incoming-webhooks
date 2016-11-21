@@ -21,9 +21,9 @@ build-linux-386:
 build-darwin-amd64:
 	@$(MAKE) build GOOS=darwin GOARCH=amd64
 
-all: build-linux-amd64 build-linux-386 build-darwin-amd64
+all: clean build-linux-amd64 build-linux-386 build-darwin-amd64
 
-test: installdeps
+test:
 	@go test -v $(shell glide nv)
 
 installdeps:

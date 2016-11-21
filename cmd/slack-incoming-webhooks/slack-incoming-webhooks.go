@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	exitOK = iota
+	notExit = iota - 1
+	exitOK
 	exitErr
 	exitArgsParseErr = 255
 )
@@ -20,11 +21,12 @@ const (
 var build string = "devel"
 
 type options struct {
-	WebHookURL string `long:"webhook-url" description:"Webhook URL to use."`
+	WebHookURL string `short:"w" long:"webhook-url" description:"Webhook URL to use."`
 	Channel    string `short:"c" long:"channel" description:"channel the message should be sent to."`
 	Username   string `short:"u" long:"username" description:"username that should be used as the sender."`
-	IconEmoji  string `short:"i" long:"icon-emoji" description:"Slack emoji to use as the icon, e.g. ':ghost:'."`
-	IconUrl    string `long:"icon-url" description:"URL of an icon image to use."`
+	IconEmoji  string `short:"e" long:"icon-emoji" description:"Slack emoji to use as the icon, e.g. ':ghost:'."`
+	IconUrl    string `short:"i" long:"icon-url" description:"URL of an icon image to use."`
+	Configure  string `long:"configure" description:"set Webhook URL as default."`
 	Help       bool   `short:"h" long:"help" description:"show this help message."`
 }
 
@@ -33,20 +35,12 @@ func main() {
 }
 
 func Run() int {
-	opts, remain, err := parseOptions(os.Args[1:])
-	if err != nil {
-		return exitArgsParseErr
-	} else if opts.Help {
-		return exitOK
+	text, opts, status := parseArgs(os.Args[1:])
+	if status != notExit {
+		return status
 	}
 
-	text, err := readText(remain[0:])
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return exitArgsParseErr
-	}
-
-	client, err := slackIncomingWebhooks.NewClient(opts.WebHookURL)
+	url, err := slackIncomingWebhooks.ReadConfig(opts.WebHookURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitErr
@@ -60,7 +54,7 @@ func Run() int {
 		Text:      text,
 	}
 
-	if err := client.Post(payload); err != nil {
+	if err := slackIncomingWebhooks.Post(url, payload); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitErr
 	}
@@ -68,24 +62,47 @@ func Run() int {
 	return exitOK
 }
 
-func parseOptions(args []string) (opts *options, remain []string, err error) {
-	opts = &options{}
+func parseArgs (args []string) (string, *options, int) {
+	opts := &options{}
 	parser := flags.NewParser(opts, flags.PrintErrors|flags.PassDoubleDash)
 	parser.Usage = fmt.Sprintf("[OPTIONS] [MESSAGE ...]\n\nVersion:\n  %s (build: %s)", slackIncomingWebhooks.Version, build)
 
-	if remain, err = parser.ParseArgs(args); opts.Help || err != nil {
+	remains, err := parser.ParseArgs(args)
+	if err != nil {
 		parser.WriteHelp(os.Stderr)
+		return "", nil, exitArgsParseErr
 	}
 
-	return
-}
+	if opts.Help {
+		parser.WriteHelp(os.Stderr)
+		return "", nil, exitOK
+	}
 
-func readText(args []string) (string, error) {
+	if opts.Configure != "" {
+		if err := slackIncomingWebhooks.WriteConfig(opts.Configure); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return "", nil, exitErr
+		} else {
+			return "", nil, exitOK
+		}
+	}
+
 	if isatty.IsTerminal(os.Stdin.Fd()) {
-		return strings.Join(args, " "), nil
-	} else if in, err := ioutil.ReadAll(os.Stdin); err == nil {
-		return string(in), nil
+		if len(remains) == 0 {
+			parser.WriteHelp(os.Stderr)
+			return "", nil, exitOK
+		} else {
+			return strings.Join(remains, " "), opts, notExit
+		}
 	} else {
-		return "", err
+		if in, err := ioutil.ReadAll(os.Stdin); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return "", nil, exitArgsParseErr
+		} else if text := string(in); text == "" {
+			fmt.Fprintln(os.Stderr, "message body should not be empty")
+			return "", nil, exitArgsParseErr
+		} else {
+			return text, opts, notExit
+		}
 	}
 }

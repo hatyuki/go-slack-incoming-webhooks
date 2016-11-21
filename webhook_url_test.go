@@ -5,91 +5,76 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/goulash/xdg"
 )
 
-func TestConfigFromFile(t *testing.T) {
-	fp, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Skip(err.Error())
+func TestDefaultConfig(t *testing.T) {
+	if _, err := ReadConfig(""); err == nil {
+		t.Error("should return an error")
 	}
-	defer func() {
-		fp.Close()
-		os.Remove(fp.Name())
-	}()
 
-	want := "http://example.com/"
-	fp.Write([]byte(want))
-
-	got, err := GetWebhookURL(fp.Name())
+	dir, err := ioutil.TempDir("", "")
 	if err != nil {
-		t.Error(err.Error())
+		t.Skipf("could not create directory: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	orig := xdg.Getenv
+	defer func() { xdg.Getenv = orig }()
+
+	xdg.Getenv = func(key string) string {
+		if key == "XDG_CONFIG_HOME" {
+			return dir
+		} else if key == "XDG_CONFIG_DIRS" {
+			return ""
+		} else {
+			return orig(key)
+		}
+	}
+
+	config := filepath.Join(dir, configfile)
+	if err := os.MkdirAll(filepath.Dir(config), 0700); err != nil {
+		t.Skipf("could not create directory: %v", err)
+	}
+}
+
+func TestWebhookURL(t *testing.T) {
+	want := "https://example.com/"
+
+	if got, err := ReadConfig(want); err != nil {
+		t.Errorf("returns an error: got %v", err)
 	} else if got != want {
 		t.Errorf("returns wrong URL: got %v want %v\n", got, want)
 	}
 }
 
-func TestNoConfigFile(t *testing.T) {
-	if _, err := GetWebhookURL("/does/not/exists"); err == nil {
-		t.Error("does not return error")
-	}
-}
-
-func TestConfigURL(t *testing.T) {
-	wants := [...]string{"http://example.com/", "https://example.com/"}
-
-	for _, want := range wants {
-		got, err := GetWebhookURL(want)
-		if err != err {
-			t.Errorf("returns error: got %v", err)
-		} else if got != want {
-			t.Errorf("returns wrong URL: got %v want %v\n", got, want)
-		}
-	}
-}
-
-func TestConfigInvalidURL(t *testing.T) {
-	urls := [...]string{"ftp://example.com/", "http/https"}
-
-	for _, url := range urls {
-		if _, err := GetWebhookURL(url); err == nil {
-			t.Error("does not return error")
-		}
-	}
-}
-
-func TestDefaultConfig(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
+func TestReadConfig(t *testing.T) {
+	fp, err := ioutil.TempFile("", "")
 	if err != nil {
-		t.Skip(err.Error())
-	}
-	defer os.RemoveAll(dir)
-
-	fp, err := os.Create(filepath.Join(dir, configfile))
-	if err != nil {
-		t.Skip(err.Error())
+		t.Skipf("could not create file: %v", err)
 	}
 
-	home := os.Getenv("HOME")
-	defer os.Setenv("HOME", home)
-	os.Setenv("HOME", dir)
+	cleanup := func() {
+		fp.Close()
+		os.Remove(fp.Name())
+	}
+	defer cleanup()
 
-	want := "http://example.com/"
+	if _, err := ReadConfig(fp.Name()); err == nil {
+		t.Error("should return an error")
+	}
+
+	want := "https://example.com/"
 	fp.Write([]byte(want))
-
-	got, err := GetWebhookURL("")
-	if err != nil {
-		t.Errorf("returns error: got %v", err.Error())
+	if got, err := ReadConfig(fp.Name()); err != nil {
+		t.Errorf("returns an error: got %v", err)
 	} else if got != want {
-		t.Errorf("returns wrong URL: got %v want %v", got, want)
+		t.Errorf("returns wrong URL: got %v want %v\n", got, want)
 	}
-}
 
-func TestNoHome(t *testing.T) {
-	home := os.Getenv("HOME")
-	defer os.Setenv("HOME", home)
-	os.Unsetenv("HOME")
-
-	if _, err := GetWebhookURL(""); err == nil {
-		t.Error("does not return error")
+	cleanup()
+	if _, err := ReadConfig(fp.Name()); err == nil {
+		t.Error("should return an error")
 	}
 }

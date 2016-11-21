@@ -1,65 +1,64 @@
 package slackIncomingWebhooks
 
 import (
-	"bufio"
-	"net/url"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/goulash/xdg"
 	"github.com/pkg/errors"
 )
 
-const configfile = ".slack-incoming-webhooks-url"
+const configfile = "slack-incoming-webhooks/url"
 
-func GetWebhookURL (path string) (uri string, err error) {
+func ReadConfig(path string) (string, error) {
 	if path == "" {
-		uri, err = defaultConfig()
+		if path := xdg.FindConfig(configfile); path == "" {
+			return "", errors.New("no webhook URL given: use `--webhook-url` or `--configure` option")
+		} else {
+			return readConfig(path)
+		}
 	} else if strings.Index(path, "http://") == 0 || strings.Index(path, "https://") == 0 {
-		if _, err = url.ParseRequestURI(path); err == nil {
-			uri = path
-		}
+		return path, nil
 	} else {
-		if _, err = os.Stat(path); err == nil {
-			uri, err = readConfig(path)
-		}
+		return readConfig(path)
 	}
-
-	return
 }
 
-func readConfig (path string) (url string, err error) {
+func WriteConfig(uri string) error {
+	if path := xdg.UserConfig(configfile); path == "" {
+		return errors.New("could not create config file")
+	} else {
+		return writeConfig(path, uri)
+	}
+}
+
+func readConfig(path string) (string, error) {
 	fp, err := os.Open(path)
+
 	if err != nil {
 		return "", errors.Wrap(err, "could not open config file")
 	}
 	defer fp.Close()
 
-	scanner := bufio.NewScanner(fp)
-	for scanner.Scan() {
-		url = scanner.Text()
-		if url != "" {
-			break
+	buffer, err := ioutil.ReadAll(fp)
+	if err != nil {
+		return "", errors.Wrap(err, "could not read config file")
+	} else if url := string(buffer); url == "" {
+		return "", errors.Errorf("no webhook URL given: %s", path)
+	} else {
+		return url, nil
+	}
+}
+
+func writeConfig(path string, uri string) error {
+	dir := filepath.Dir(path)
+	if _, err := os.Stat(dir); err != nil {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return errors.Wrap(err, "could not create config directory")
 		}
 	}
 
-	return url, scanner.Err()
-}
-
-func defaultConfig() (string, error) {
-	if path, err := getDefaultConfigFilePath(); err == nil {
-		return readConfig(path)
-	} else {
-		return "", err
-	}
-}
-
-func getDefaultConfigFilePath() (string, error) {
-	home := os.Getenv("HOME")
-
-	if home == "" {
-		return "", errors.New("$HOME not set")
-	}
-
-	return filepath.Join(home, configfile), nil
+	return ioutil.WriteFile(path, []byte(uri), 0600)
 }
